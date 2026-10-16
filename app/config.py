@@ -1,6 +1,7 @@
 """Application configuration loaded from environment variables."""
 
 import os
+import socket
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -10,9 +11,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def _is_postgres_reachable(host: str, port: int, timeout: float = 0.5) -> bool:
+    """Quick check if a PostgreSQL TCP port is open and accepting connections."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except (socket.timeout, ConnectionRefusedError, OSError):
+        return False
+
+
 @dataclass(frozen=True)
 class DatabaseConfig:
-    """PostgreSQL connection parameters."""
+    """Database connection parameters with automatic SQLite fallback."""
 
     host: str = field(default_factory=lambda: os.getenv("DB_HOST", "localhost"))
     port: int = field(default_factory=lambda: int(os.getenv("DB_PORT", "5432")))
@@ -22,7 +32,10 @@ class DatabaseConfig:
 
     @property
     def url(self) -> str:
-        """SQLAlchemy connection URL (credentials read from env vars or Streamlit secrets)."""
+        """SQLAlchemy connection URL (PostgreSQL with zero-config SQLite cloud fallback)."""
+        if os.getenv("USE_SQLITE", "").lower() in ("1", "true", "yes"):
+            return "sqlite:///data/dataguard.db"
+
         raw_url = os.getenv("DATABASE_URL")
         if not raw_url:
             try:
@@ -32,11 +45,17 @@ class DatabaseConfig:
                 raw_url = None
 
         if raw_url:
+            if raw_url.startswith("sqlite"):
+                return raw_url
             if raw_url.startswith("postgres://"):
                 raw_url = raw_url.replace("postgres://", "postgresql+psycopg2://", 1)
             elif raw_url.startswith("postgresql://") and not raw_url.startswith("postgresql+psycopg2://"):
                 raw_url = raw_url.replace("postgresql://", "postgresql+psycopg2://", 1)
             return raw_url
+
+        # If running in cloud (e.g. Streamlit Cloud) or without local PostgreSQL running
+        if self.host in ("localhost", "127.0.0.1") and not _is_postgres_reachable(self.host, self.port):
+            return "sqlite:///data/dataguard.db"
 
         return (
             f"postgresql+psycopg2://{self.user}:{self.password}"

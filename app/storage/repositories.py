@@ -5,6 +5,7 @@ All SQL uses parameterized queries and transactions.
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
 from typing import Any
@@ -88,26 +89,57 @@ def insert_quarantined_records(
 ) -> int:
     """Batch-insert rejected records into the quarantine table.
 
+    Compatible with both PostgreSQL (JSONB) and SQLite (TEXT).
     Returns the number of rows inserted.
     """
     if not records:
         return 0
 
-    session.execute(
-        text(
-            """
-            INSERT INTO quarantined_records
-                (run_id, source_file, source_row_number, raw_record,
-                 rejection_reasons, quarantined_at)
-            VALUES
-                (:run_id, :source_file, :source_row_number,
-                 CAST(:raw_record AS JSONB),
-                 CAST(:rejection_reasons AS JSONB),
-                 NOW())
-            """
-        ),
-        records,
-    )
+    now_val = datetime.now(timezone.utc).replace(tzinfo=None)
+    records_to_insert = [
+        {
+            **rec,
+            "quarantined_at": now_val,
+            "raw_record": json.dumps(rec["raw_record"]) if not isinstance(rec["raw_record"], str) else rec["raw_record"],
+            "rejection_reasons": json.dumps(rec["rejection_reasons"]) if not isinstance(rec["rejection_reasons"], str) else rec["rejection_reasons"],
+        }
+        for rec in records
+    ]
+
+    is_sqlite = session.bind is not None and session.bind.dialect.name == "sqlite"
+
+    if is_sqlite:
+        session.execute(
+            text(
+                """
+                INSERT INTO quarantined_records
+                    (run_id, source_file, source_row_number, raw_record,
+                     rejection_reasons, quarantined_at)
+                VALUES
+                    (:run_id, :source_file, :source_row_number,
+                     :raw_record,
+                     :rejection_reasons,
+                     :quarantined_at)
+                """
+            ),
+            records_to_insert,
+        )
+    else:
+        session.execute(
+            text(
+                """
+                INSERT INTO quarantined_records
+                    (run_id, source_file, source_row_number, raw_record,
+                     rejection_reasons, quarantined_at)
+                VALUES
+                    (:run_id, :source_file, :source_row_number,
+                     CAST(:raw_record AS JSONB),
+                     CAST(:rejection_reasons AS JSONB),
+                     :quarantined_at)
+                """
+            ),
+            records_to_insert,
+        )
     session.commit()
     logger.info("Quarantined %d records.", len(records))
     return len(records)
@@ -123,8 +155,8 @@ def upsert_orders(
 ) -> tuple[int, int]:
     """Upsert validated order records into the ``orders`` table.
 
-    Uses PostgreSQL ``ON CONFLICT ... DO UPDATE`` to ensure idempotent
-    behavior.  If the ``order_id`` already exists the row is updated.
+    Uses ``ON CONFLICT ... DO UPDATE`` to ensure idempotent
+    behavior across both PostgreSQL and SQLite.
 
     Returns
     -------
@@ -136,19 +168,37 @@ def upsert_orders(
 
     inserted = 0
     updated = 0
+    now_val = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Collect all order_ids to check which already exist
     order_ids = [rec["order_id"] for rec in records]
 
-    # Query existing order_ids in one batch
-    existing_rows = session.execute(
-        text("SELECT order_id FROM orders WHERE order_id = ANY(:ids)"),
-        {"ids": order_ids},
-    ).fetchall()
+    is_sqlite = session.bind is not None and session.bind.dialect.name == "sqlite"
+
+    if is_sqlite:
+        placeholders = ", ".join(f":id_{i}" for i in range(len(order_ids)))
+        params = {f"id_{i}": oid for i, oid in enumerate(order_ids)}
+        existing_rows = session.execute(
+            text(f"SELECT order_id FROM orders WHERE order_id IN ({placeholders})"),
+            params,
+        ).fetchall()
+    else:
+        existing_rows = session.execute(
+            text("SELECT order_id FROM orders WHERE order_id = ANY(:ids)"),
+            {"ids": order_ids},
+        ).fetchall()
+
     existing_ids = {row[0] for row in existing_rows}
 
     for rec in records:
         is_update = rec["order_id"] in existing_ids
+
+        row_params = dict(rec)
+        row_params["now"] = now_val
+        if is_sqlite:
+            for k in ("unit_price", "total_amount"):
+                if k in row_params and hasattr(row_params[k], "__float__"):
+                    row_params[k] = float(row_params[k])
 
         session.execute(
             text(
@@ -160,7 +210,7 @@ def upsert_orders(
                 VALUES
                     (:order_id, :customer_id, :order_date, :product, :quantity,
                      :unit_price, :total_amount, :status, :source_file,
-                     NOW(), NOW())
+                     :now, :now)
                 ON CONFLICT (order_id) DO UPDATE SET
                     customer_id  = EXCLUDED.customer_id,
                     order_date   = EXCLUDED.order_date,
@@ -170,10 +220,10 @@ def upsert_orders(
                     total_amount = EXCLUDED.total_amount,
                     status       = EXCLUDED.status,
                     source_file  = EXCLUDED.source_file,
-                    updated_at   = NOW()
+                    updated_at   = :now
                 """
             ),
-            rec,
+            row_params,
         )
 
         if is_update:

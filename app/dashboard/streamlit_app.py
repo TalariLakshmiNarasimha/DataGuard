@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from app.config import get_config
 from app.ingestion.csv_reader import REQUIRED_COLUMNS
 from app.pipeline import run_pipeline
-from app.storage.database import get_engine
+from app.storage.database import get_engine, init_schema
 
 # ---------------------------------------------------------------------------
 # Page configuration
@@ -181,10 +181,12 @@ st.markdown(
 
 @st.cache_resource
 def get_db_engine():
-    """Create a cached database engine."""
+    """Create a cached database engine and initialize schema."""
     try:
         config = get_config()
-        return get_engine(config.db.url)
+        engine = get_engine(config.db.url)
+        init_schema(engine)
+        return engine
     except Exception as e:
         return None
 
@@ -238,6 +240,13 @@ page = st.sidebar.radio(
 st.session_state["nav_page"] = page
 
 st.sidebar.markdown("---")
+_active_engine = get_db_engine()
+_dialect = _active_engine.dialect.name if _active_engine is not None else "unknown"
+if _dialect == "sqlite":
+    st.sidebar.caption("💾 **Storage**: `SQLite (Embedded / Cloud)`")
+else:
+    st.sidebar.caption("🐘 **Storage**: `PostgreSQL (Connected)`")
+
 st.sidebar.markdown(
     '<div class="synthetic-note">⚠️ All data shown is synthetic sample data for demonstration purposes.</div>',
     unsafe_allow_html=True,

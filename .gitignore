@@ -37,3 +37,6 @@ pgdata/
 
 # Uploads directory
 data/uploads/
+
+# SQLite databases
+*.db
