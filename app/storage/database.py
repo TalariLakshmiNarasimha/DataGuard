@@ -19,10 +19,12 @@ logger = logging.getLogger("dataguard.storage")
 _SCHEMA_FILE = Path(__file__).parent / "schema.sql"
 
 
-def get_engine(database_url: str) -> Engine:
+def get_engine(database_url: str, fallback_to_sqlite: bool = True) -> Engine:
     """Create and return a SQLAlchemy engine.
 
-    Supports both PostgreSQL and SQLite.
+    Supports both PostgreSQL and SQLite. If PostgreSQL is unreachable
+    and *fallback_to_sqlite* is True, automatically falls back to an
+    embedded SQLite database so the app never crashes.
     """
     if database_url.startswith("sqlite"):
         if "///" in database_url:
@@ -30,7 +32,31 @@ def get_engine(database_url: str) -> Engine:
             if path_part and path_part != ":memory:":
                 Path(path_part).parent.mkdir(parents=True, exist_ok=True)
         return create_engine(database_url, connect_args={"check_same_thread": False})
-    return create_engine(database_url, pool_pre_ping=True, pool_size=5)
+
+    # For PostgreSQL, test connection with short timeout; fallback to SQLite if unreachable
+    try:
+        engine = create_engine(
+            database_url,
+            pool_pre_ping=True,
+            pool_size=5,
+            connect_args={"connect_timeout": 3},
+        )
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return engine
+    except Exception as exc:
+        if fallback_to_sqlite:
+            logger.warning(
+                "PostgreSQL connection failed (%s). Automatically falling back to SQLite.",
+                exc,
+            )
+            fallback_path = Path("data/dataguard.db")
+            fallback_path.parent.mkdir(parents=True, exist_ok=True)
+            return create_engine(
+                f"sqlite:///{fallback_path.as_posix()}",
+                connect_args={"check_same_thread": False},
+            )
+        raise
 
 
 def get_session_factory(engine: Engine) -> sessionmaker:

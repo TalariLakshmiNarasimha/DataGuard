@@ -28,7 +28,7 @@ class DatabaseConfig:
     port: int = field(default_factory=lambda: int(os.getenv("DB_PORT", "5432")))
     name: str = field(default_factory=lambda: os.getenv("DB_NAME", "dataguard"))
     user: str = field(default_factory=lambda: os.getenv("DB_USER", "dataguard"))
-    password: str = field(default_factory=lambda: os.getenv("DB_PASSWORD", "dataguard"))
+    password: str = field(default_factory=lambda: os.getenv("DB_PASSWORD", "dataguard_secret"))
 
     @property
     def url(self) -> str:
