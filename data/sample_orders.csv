@@ -1,0 +1,27 @@
+order_id,customer_id,order_date,product,quantity,unit_price,status
+ORD-001,CUST-101,2024-01-15,Widget A,5,29.99,shipped
+ORD-002,CUST-102,2024-01-16,Widget B,3,49.99,pending
+ORD-003,CUST-103,2024-01-17,Gadget Pro,10,99.50,delivered
+ORD-004,CUST-104,2024-02-01,Widget A,2,29.99,cancelled
+ORD-005,CUST-105,2024-02-03,Gadget Lite,1,149.00,shipped
+ORD-006,CUST-106,2024-02-10,Widget C,7,19.99,pending
+ORD-007,CUST-107,2024-03-01,Gadget Pro,4,99.50,shipped
+ORD-008,CUST-108,2024-03-05,Widget B,12,49.99,delivered
+ORD-009,CUST-109,2024-03-12,Widget A,6,29.99,pending
+ORD-010,CUST-110,2024-03-20,Gadget Lite,2,149.00,delivered
+ORD-011,CUST-111,2024-04-01,Widget D,8,39.99,shipped
+ORD-012,CUST-112,2024-04-05,Gadget Pro,3,99.50,pending
+ORD-013,,2024-04-10,Widget A,5,29.99,shipped
+ORD-014,CUST-114,not-a-date,Widget B,2,49.99,pending
+ORD-015,CUST-115,2024-04-20,Gadget Pro,0,99.50,shipped
+ORD-016,CUST-116,2024-04-25,Widget C,3,-5.00,delivered
+ORD-017,CUST-117,2024-05-01,,4,29.99,shipped
+ORD-018,CUST-118,2024-05-05,Widget A,abc,29.99,pending
+ORD-019,CUST-119,2024-05-10,Gadget Lite,2,149.00,REFUNDED
+ORD-020,CUST-120,2024-05-15,Widget B,1,49.99,delivered
+ORD-003,CUST-121,2024-05-20,Widget D,5,39.99,shipped
+ORD-021, CUST-122 ,2024-06-01, Widget A ,3, 29.99 , pending
+ORD-022,CUST-123,2024-06-10,Gadget Pro,2,99.50,shipped
+ORD-023,CUST-124,2024-06-15,Widget C,15,19.99,delivered
+ORD-024,CUST-125,2024-06-20,Gadget Lite,1,149.00,cancelled
+ORD-025,CUST-126,2024-07-01,Widget B,4,49.99,pending

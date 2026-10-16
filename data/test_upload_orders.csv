@@ -1,0 +1,11 @@
+order_id,customer_id,order_date,product,quantity,unit_price,status
+ORD-501,CUST-201,2026-10-01,DataGuard Sensor,4,45.50,delivered
+ORD-502,CUST-202,2026-10-02,Edge Hub Pro,2,129.99,shipped
+ORD-503,CUST-203,2026-10-03,Cloud Gateway,1,249.00,pending
+ORD-504,CUST-204,2026-10-04,Smart Tag A1,10,12.75,shipped
+ORD-505,CUST-205,2026-10-05,Data Cable 2m,5,8.99,delivered
+ORD-506,,2026-10-06,Edge Hub Pro,1,129.99,pending
+ORD-507,CUST-207,invalid-date-format,Cloud Gateway,3,-15.00,shipped
+ORD-508,CUST-208,2026-10-08,DataGuard Sensor,0,45.50,UNKNOWN_STATUS
+ORD-509,CUST-209,2026-10-09,Smart Tag A1,8,12.75,cancelled
+ORD-510,CUST-210,2026-10-10,Backup Power Pack,2,89.00,shipped
