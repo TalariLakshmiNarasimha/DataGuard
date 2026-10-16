@@ -22,7 +22,22 @@ class DatabaseConfig:
 
     @property
     def url(self) -> str:
-        """SQLAlchemy connection URL (credentials read from env vars at runtime)."""
+        """SQLAlchemy connection URL (credentials read from env vars or Streamlit secrets)."""
+        raw_url = os.getenv("DATABASE_URL")
+        if not raw_url:
+            try:
+                import streamlit as st
+                raw_url = st.secrets.get("DATABASE_URL") or st.secrets.get("postgres", {}).get("url")
+            except Exception:
+                raw_url = None
+
+        if raw_url:
+            if raw_url.startswith("postgres://"):
+                raw_url = raw_url.replace("postgres://", "postgresql+psycopg2://", 1)
+            elif raw_url.startswith("postgresql://") and not raw_url.startswith("postgresql+psycopg2://"):
+                raw_url = raw_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            return raw_url
+
         return (
             f"postgresql+psycopg2://{self.user}:{self.password}"
             f"@{self.host}:{self.port}/{self.name}"
